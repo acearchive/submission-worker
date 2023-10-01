@@ -1,0 +1,8 @@
+name = "acearchive-submission"
+main = "src/index.ts"
+compatibility_date = "2023-09-22"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "acearchive-artifacts"
+database_id = "b549c2d7-f206-4efa-b0bd-a182773bbea6"
