@@ -1,13 +1,16 @@
 -- Migration number: 0000 	 2023-10-01T20:08:40.343Z
 CREATE TABLE
   "artifacts" (
-    "id" text PRIMARY KEY,
-    "slug" text UNIQUE NOT NULL,
+    "id" integer PRIMARY KEY,
+    "key" text NOT NULL,
+    "version" integer NOT NULL,
+    "slug" text NOT NULL,
     "title" text NOT NULL,
     "summary" text NOT NULL,
     "description" text,
     "from_year" integer NOT NULL,
-    "to_year" integer
+    "to_year" integer,
+    UNIQUE ("key", "version")
   );
 
 CREATE TABLE
