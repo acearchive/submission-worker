@@ -3,6 +3,8 @@ import { Artifact, ArtifactFile, ArtifactLink } from "./model";
 type ArtifactId = number;
 type FileId = number;
 
+type ArtifactData = Pick<Artifact, "slug" | "title" | "summary" | "description" | "from_year" | "to_year">;
+
 class Database {
   private db: D1Database;
 
@@ -10,35 +12,19 @@ class Database {
     this.db = db;
   }
 
-  insertArtifact = async (artifact: Artifact): Promise<ArtifactId> => {
+  insertArtifact = async (artifact: ArtifactData): Promise<ArtifactId> => {
     const artifactId = await this.db
       .prepare(
         `
         INSERT INTO
-          artifacts (key, version, slug, title, summary, description, from_year, to_year)
-        VALUES (
-          ?1,
-          (
-            SELECT
-              IFNULL(MAX(version), 0) + 1
-            FROM
-              artifacts
-            WHERE
-              key = ?1
-          ),
-          ?2,
-          ?3,
-          ?4,
-          ?5,
-          ?6,
-          ?7
-        )
+          artifacts (slug, title, summary, description, from_year, to_year)
+        VALUES
+          (?1, ?2, ?3, ?4, ?5, ?6)
         RETURNING
           id
       `
       )
       .bind(
-        artifact.id,
         artifact.slug,
         artifact.title,
         artifact.summary,
@@ -52,6 +38,10 @@ class Database {
       throw new Error("inserting new artifact did not return a database ID");
     }
 
+    return artifactId;
+  };
+
+  insertArtifactAliases = async (artifactId: ArtifactId, aliases: ReadonlyArray<string>) => {
     const aliasStmt = this.db.prepare(`
       INSERT INTO
         artifact_aliases
@@ -59,9 +49,7 @@ class Database {
         (artifact, slug)
     `);
 
-    await this.db.batch(artifact.aliases.map((alias) => aliasStmt.bind(artifactId, alias)));
-
-    return artifactId;
+    await this.db.batch(aliases.map((alias) => aliasStmt.bind(artifactId, alias)));
   };
 
   insertFiles = async (artifactId: ArtifactId, files: ReadonlyArray<ArtifactFile>) => {
@@ -152,6 +140,31 @@ class Database {
 
     await this.db.batch(decades.map((decade) => stmt.bind(artifactId, decade)));
   };
+
+  commitArtifact = async (artifactId: ArtifactId, key: string) => {
+    await this.db
+      .prepare(
+        `
+        INSERT INTO
+          artifact_versions (key, version, artifact, created_at)
+        VALUES (
+          ?1,
+          (
+            SELECT
+              IFNULL(MAX(version), 0) + 1
+            FROM
+              artifact_versions
+            WHERE
+              key = ?1
+          ),
+          ?2,
+          unixepoch('now')
+        )
+      `
+      )
+      .bind(artifactId, key)
+      .run();
+  };
 }
 
 export const insertArtifact = async (d1: D1Database, artifact: Artifact) => {
@@ -159,9 +172,11 @@ export const insertArtifact = async (d1: D1Database, artifact: Artifact) => {
 
   let artifactId = await db.insertArtifact(artifact);
 
+  await db.insertArtifactAliases(artifactId, artifact.aliases);
   await db.insertFiles(artifactId, artifact.files);
   await db.insertLinks(artifactId, artifact.links);
   await db.insertPeople(artifactId, artifact.people);
   await db.insertIdentities(artifactId, artifact.identities);
   await db.insertDecades(artifactId, artifact.decades);
+  await db.commitArtifact(artifactId, artifact.id);
 };
