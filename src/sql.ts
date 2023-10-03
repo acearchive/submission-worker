@@ -180,7 +180,7 @@ class Database {
         )
       `
       )
-      .bind(artifactId, key)
+      .bind(key, artifactId)
       .run();
   };
 }
