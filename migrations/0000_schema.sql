@@ -13,11 +13,11 @@ CREATE TABLE
 CREATE TABLE
   "artifact_versions" (
     "id" integer PRIMARY KEY,
-    "key" text NOT NULL,
+    "artifact_id" text NOT NULL,
     "version" integer NOT NULL,
     "artifact" integer NOT NULL UNIQUE REFERENCES "artifacts" ("id"),
     "created_at" integer NOT NULL,
-    UNIQUE ("key", "version")
+    UNIQUE ("artifact_id", "version")
   );
 
 CREATE TABLE

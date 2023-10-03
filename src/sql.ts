@@ -1,21 +1,21 @@
-import { Artifact, ArtifactFile, ArtifactLink } from "./model";
+import { Artifact, ArtifactFile } from "./model";
 
-type ArtifactId = number;
-type FileId = number;
+// These types represent database primary keys, not to be confused with an Artifact ID.
+type ArtifactKey = number;
+type FileKey = number;
 
-type ArtifactData = Pick<Artifact, "slug" | "title" | "summary" | "description" | "from_year" | "to_year">;
-
-type FileWithId = ArtifactFile & { id: FileId };
+// An artifact file with its database primary key.
+type KeyedArtifactFile = ArtifactFile & { key: FileKey };
 
 class Database {
-  private db: D1Database;
+  private readonly db: D1Database;
 
   constructor(db: D1Database) {
     this.db = db;
   }
 
-  insertArtifact = async (artifact: ArtifactData): Promise<ArtifactId> => {
-    const artifactId = await this.db
+  insertArtifact = async (artifact: Artifact): Promise<ArtifactKey> => {
+    const artifactKey = await this.db
       .prepare(
         `
         INSERT INTO
@@ -36,17 +36,17 @@ class Database {
       )
       .first<number>("id");
 
-    if (artifactId == null) {
+    if (artifactKey == null) {
       throw new Error("inserting new artifact did not return a database ID");
     }
 
-    return artifactId;
+    return artifactKey;
   };
 
   insertFiles = async (
-    artifactId: ArtifactId,
-    files: ReadonlyArray<ArtifactFile>
-  ): Promise<ReadonlyArray<FileWithId>> => {
+    artifactKey: ArtifactKey,
+    files: Artifact["files"]
+  ): Promise<ReadonlyArray<KeyedArtifactFile>> => {
     const fileStmt = this.db.prepare(`
         INSERT INTO
           files (artifact, filename, name, media_type, multihash, lang, hidden)
@@ -63,10 +63,10 @@ class Database {
           id
     `);
 
-    const fileRows = await this.db.batch<{ id: FileId }>(
+    const fileRows = await this.db.batch<{ id: FileKey }>(
       files.map((file) =>
         fileStmt.bind(
-          artifactId,
+          artifactKey,
           file.filename,
           file.name,
           file.media_type ?? null,
@@ -80,14 +80,14 @@ class Database {
     const fileIds = fileRows.map((row) => row.results[0].id);
 
     return files.map((file, index) => ({
-      id: fileIds[index],
+      key: fileIds[index],
       ...file,
     }));
   };
 
   prepareArtifactAliases = (
-    artifactId: ArtifactId,
-    aliases: ReadonlyArray<string>
+    artifactKey: ArtifactKey,
+    aliases: Artifact["aliases"]
   ): ReadonlyArray<D1PreparedStatement> => {
     const aliasStmt = this.db.prepare(`
       INSERT INTO
@@ -96,11 +96,11 @@ class Database {
         (artifact, slug)
     `);
 
-    return aliases.map((alias) => aliasStmt.bind(artifactId, alias));
+    return aliases.map((alias) => aliasStmt.bind(artifactKey, alias));
   };
 
   prepareFileAliases = (
-    files: ReadonlyArray<Pick<FileWithId, "id" | "aliases">>
+    files: ReadonlyArray<Pick<ArtifactFile, "aliases"> & { key: FileKey }>
   ): ReadonlyArray<D1PreparedStatement> => {
     const aliasStmt = this.db.prepare(`
       INSERT INTO
@@ -109,10 +109,10 @@ class Database {
         (?1, ?2)
     `);
 
-    return files.flatMap((file) => file.aliases.map((alias) => aliasStmt.bind(file.id, alias)));
+    return files.flatMap((file) => file.aliases.map((alias) => aliasStmt.bind(file.key, alias)));
   };
 
-  prepareLinks = (artifactId: ArtifactId, links: ReadonlyArray<ArtifactLink>): ReadonlyArray<D1PreparedStatement> => {
+  prepareLinks = (artifactKey: ArtifactKey, links: Artifact["links"]): ReadonlyArray<D1PreparedStatement> => {
     const stmt = this.db.prepare(`
       INSERT INTO
         links (artifact, name, url)
@@ -120,10 +120,10 @@ class Database {
         (?1, ?2, ?3)
     `);
 
-    return links.map((link) => stmt.bind(artifactId, link.name, link.url));
+    return links.map((link) => stmt.bind(artifactKey, link.name, link.url));
   };
 
-  preparePeople = (artifactId: ArtifactId, people: ReadonlyArray<string>): ReadonlyArray<D1PreparedStatement> => {
+  preparePeople = (artifactKey: ArtifactKey, people: Artifact["people"]): ReadonlyArray<D1PreparedStatement> => {
     const stmt = this.db.prepare(`
       INSERT INTO
         people (artifact, name)
@@ -131,12 +131,12 @@ class Database {
         (?1, ?2)
     `);
 
-    return people.map((name) => stmt.bind(artifactId, name));
+    return people.map((name) => stmt.bind(artifactKey, name));
   };
 
   prepareIdentities = (
-    artifactId: ArtifactId,
-    identities: ReadonlyArray<string>
+    artifactKey: ArtifactKey,
+    identities: Artifact["identities"]
   ): ReadonlyArray<D1PreparedStatement> => {
     const stmt = this.db.prepare(`
       INSERT INTO
@@ -145,10 +145,10 @@ class Database {
         (?1, ?2)
     `);
 
-    return identities.map((name) => stmt.bind(artifactId, name));
+    return identities.map((name) => stmt.bind(artifactKey, name));
   };
 
-  prepareDecades = (artifactId: ArtifactId, decades: ReadonlyArray<string>): ReadonlyArray<D1PreparedStatement> => {
+  prepareDecades = (artifactKey: ArtifactKey, decades: Artifact["decades"]): ReadonlyArray<D1PreparedStatement> => {
     const stmt = this.db.prepare(`
       INSERT INTO
         decades (artifact, decade)
@@ -156,15 +156,23 @@ class Database {
         (?1, ?2)
     `);
 
-    return decades.map((decade) => stmt.bind(artifactId, decade));
+    return decades.map((decade) => stmt.bind(artifactKey, decade));
   };
 
-  commitArtifact = async (artifactId: ArtifactId, key: string) => {
+  // We can't batch every insertion into one atomic transaction because we need to set up the
+  // foreign key relationships and D1 doesn't allow manual transactions. Instead, we use the
+  // `artifact_versions` table to maintain atomicity. We write to this table last, after all the
+  // rest of the artifact data is committed.
+  //
+  // If there is a row in `artifacts` without a corresponding row in `artifact_versions`, that data
+  // is considered orphaned and we can clean it up later if necessary. In practice, we will likely
+  // never need to.
+  commitArtifact = async (artifactKey: ArtifactKey, artifactId: Artifact["id"]) => {
     await this.db
       .prepare(
         `
         INSERT INTO
-          artifact_versions (key, version, artifact, created_at)
+          artifact_versions (artifact_id, version, artifact, created_at)
         VALUES (
           ?1,
           (
@@ -173,32 +181,35 @@ class Database {
             FROM
               artifact_versions
             WHERE
-              key = ?1
+              artifact_id = ?1
           ),
           ?2,
           unixepoch('now')
         )
       `
       )
-      .bind(key, artifactId)
+      .bind(artifactId, artifactKey)
       .run();
   };
 }
 
+// Insert an artifact into the database.
 export const insertArtifact = async (d1: D1Database, artifact: Artifact) => {
   let db = new Database(d1);
 
-  let artifactId = await db.insertArtifact(artifact);
-  let files = await db.insertFiles(artifactId, artifact.files);
+  let artifactKey = await db.insertArtifact(artifact);
+
+  let keyedFiles = await db.insertFiles(artifactKey, artifact.files);
 
   await d1.batch([
-    ...db.prepareArtifactAliases(artifactId, artifact.aliases),
-    ...db.prepareFileAliases(files),
-    ...db.prepareLinks(artifactId, artifact.links),
-    ...db.preparePeople(artifactId, artifact.people),
-    ...db.prepareIdentities(artifactId, artifact.identities),
-    ...db.prepareDecades(artifactId, artifact.decades),
+    ...db.prepareArtifactAliases(artifactKey, artifact.aliases),
+    ...db.prepareFileAliases(keyedFiles),
+    ...db.prepareLinks(artifactKey, artifact.links),
+    ...db.preparePeople(artifactKey, artifact.people),
+    ...db.prepareIdentities(artifactKey, artifact.identities),
+    ...db.prepareDecades(artifactKey, artifact.decades),
   ]);
 
-  db.commitArtifact(artifactId, artifact.id);
+  // This query comes last; it atomically commits the artifact to the database.
+  db.commitArtifact(artifactKey, artifact.id);
 };
