@@ -195,11 +195,11 @@ class Database {
 
 // Insert an artifact into the database.
 export const insertArtifact = async (d1: D1Database, artifact: Artifact) => {
-  let db = new Database(d1);
+  const db = new Database(d1);
 
-  let artifactKey = await db.insertArtifact(artifact);
+  const artifactKey = await db.insertArtifact(artifact);
 
-  let keyedFiles = await db.insertFiles(artifactKey, artifact.files);
+  const keyedFiles = await db.insertFiles(artifactKey, artifact.files);
 
   await d1.batch([
     ...db.prepareArtifactAliases(artifactKey, artifact.aliases),
