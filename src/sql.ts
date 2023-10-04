@@ -72,7 +72,7 @@ class Database {
           file.media_type ?? null,
           file.multihash,
           file.lang ?? null,
-          file.hidden
+          file.hidden ? 1 : 0
         )
       )
     );
