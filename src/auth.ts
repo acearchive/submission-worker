@@ -15,10 +15,12 @@ const getAuth = (req: Request): Authorization => {
   const [scheme, encoded] = authorization.split(" ");
 
   if (!encoded) {
+    console.log("Missing encoded credential after auth scheme");
     throw Unauthorized("Malformed authorization header");
   }
 
   if (scheme !== "Basic") {
+    console.log(`Header contains ${scheme} auth scheme`);
     throw Unauthorized("Unsupported authorization scheme");
   }
 
@@ -28,6 +30,7 @@ const getAuth = (req: Request): Authorization => {
   const index = decoded.indexOf(":");
 
   if (index === -1) {
+    console.log("Decoded credential missing colon separator");
     throw Unauthorized("Malformed authorization header");
   }
 
@@ -46,6 +49,8 @@ export const validateAuth = (req: Request, auth: Authorization) => {
 
   const { user, pass } = getAuth(req);
 
+  console.log("Retrieved credentials from auth header");
+
   const actualCredentials = `${user}:${pass}`;
   const expectedCredentials = `${auth.user}:${auth.pass}`;
 
@@ -55,10 +60,12 @@ export const validateAuth = (req: Request, auth: Authorization) => {
   const encodedExpected = encoder.encode(expectedCredentials);
 
   if (encodedActual.byteLength != encodedExpected.byteLength) {
+    console.log("Expected vs actual credentials are different lengths");
     throw Unauthorized("Invalid credentials");
   }
 
   if (!crypto.subtle.timingSafeEqual(encodedActual, encodedExpected)) {
+    console.log("Expected vs actual credentials are the same length but not equal");
     throw Unauthorized("Invalid credentials");
   }
 };

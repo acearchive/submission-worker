@@ -27,7 +27,11 @@ const submit: RouteHandler = async (req, env): Promise<Response> => {
     throw MethodNotAllowed("Unsupported HTTP method", ["POST"]);
   }
 
+  console.log("Deserializing request body");
+
   const reqBody = await req.json<Artifact>();
+
+  console.log(JSON.stringify(reqBody));
 
   await insertArtifact(env.DB, reqBody);
 
@@ -39,6 +43,8 @@ const submit: RouteHandler = async (req, env): Promise<Response> => {
 export default {
   fetch: (request: Request, env: Env) =>
     router.handle(request, env).catch((err) => {
+      console.log(err.message);
+
       if (err instanceof ResponseError) {
         return json({ error: err.message, status: err.status }, { status: err.status, headers: err.headers });
       } else {

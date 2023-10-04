@@ -15,6 +15,8 @@ class Database {
   }
 
   insertArtifact = async (artifact: Artifact): Promise<ArtifactKey> => {
+    console.log("Inserting into `artifacts` table");
+
     const artifactKey = await this.db
       .prepare(
         `
@@ -47,6 +49,8 @@ class Database {
     artifactKey: ArtifactKey,
     files: Artifact["files"]
   ): Promise<ReadonlyArray<KeyedArtifactFile>> => {
+    console.log("Inserting into `files` table");
+
     const fileStmt = this.db.prepare(`
         INSERT INTO
           files (artifact, filename, name, media_type, multihash, lang, hidden)
@@ -89,6 +93,8 @@ class Database {
     artifactKey: ArtifactKey,
     aliases: Artifact["aliases"]
   ): ReadonlyArray<D1PreparedStatement> => {
+    console.log("Preparing query to insert into `artifact_aliases` table");
+
     const aliasStmt = this.db.prepare(`
       INSERT INTO
         artifact_aliases
@@ -102,6 +108,8 @@ class Database {
   prepareFileAliases = (
     files: ReadonlyArray<Pick<ArtifactFile, "aliases"> & { key: FileKey }>
   ): ReadonlyArray<D1PreparedStatement> => {
+    console.log("Preparing query to insert into `file_aliases` table");
+
     const aliasStmt = this.db.prepare(`
       INSERT INTO
         file_aliases (file, filename)
@@ -113,6 +121,8 @@ class Database {
   };
 
   prepareLinks = (artifactKey: ArtifactKey, links: Artifact["links"]): ReadonlyArray<D1PreparedStatement> => {
+    console.log("Preparing query to insert into `links` table");
+
     const stmt = this.db.prepare(`
       INSERT INTO
         links (artifact, name, url)
@@ -124,6 +134,8 @@ class Database {
   };
 
   preparePeople = (artifactKey: ArtifactKey, people: Artifact["people"]): ReadonlyArray<D1PreparedStatement> => {
+    console.log("Preparing query to insert into `people` table");
+
     const stmt = this.db.prepare(`
       INSERT INTO
         people (artifact, name)
@@ -138,6 +150,8 @@ class Database {
     artifactKey: ArtifactKey,
     identities: Artifact["identities"]
   ): ReadonlyArray<D1PreparedStatement> => {
+    console.log("Preparing query to insert into `identities` table");
+
     const stmt = this.db.prepare(`
       INSERT INTO
         identities (artifact, name)
@@ -149,6 +163,8 @@ class Database {
   };
 
   prepareDecades = (artifactKey: ArtifactKey, decades: Artifact["decades"]): ReadonlyArray<D1PreparedStatement> => {
+    console.log("Preparing query to insert into `decades` table");
+
     const stmt = this.db.prepare(`
       INSERT INTO
         decades (artifact, decade)
@@ -168,6 +184,8 @@ class Database {
   // is considered orphaned and we can clean it up later if necessary. In practice, we will likely
   // never need to.
   commitArtifact = async (artifactKey: ArtifactKey, artifactId: Artifact["id"]) => {
+    console.log("Inserting into `artifact_versions` table");
+
     await this.db
       .prepare(
         `
@@ -201,6 +219,8 @@ export const insertArtifact = async (d1: D1Database, artifact: Artifact) => {
 
   const keyedFiles = await db.insertFiles(artifactKey, artifact.files);
 
+  console.log("Performing batch insert queries");
+
   await d1.batch([
     ...db.prepareArtifactAliases(artifactKey, artifact.aliases),
     ...db.prepareFileAliases(keyedFiles),
@@ -212,4 +232,6 @@ export const insertArtifact = async (d1: D1Database, artifact: Artifact) => {
 
   // This query comes last; it atomically commits the artifact to the database.
   db.commitArtifact(artifactKey, artifact.id);
+
+  console.log("Finished inserting new artifact");
 };
