@@ -1,33 +1,25 @@
-import { badRequest, unauthorized } from "./response";
+import { BadRequest, Unauthorized } from "./response";
 
-type AuthorizationResult =
-  | {
-      success: true;
-      user: string;
-      pass: string;
-    }
-  | {
-      success: false;
-      resp: Response;
-    };
+export interface Authorization {
+  user: string;
+  pass: string;
+}
 
-const getAuthorization = (req: Request): AuthorizationResult => {
+const getAuth = (req: Request): Authorization => {
   const authorization = req.headers.get("Authorization");
 
   if (authorization === null) {
-    return {
-      success: false,
-      resp: unauthorized(),
-    };
+    throw Unauthorized("Missing authorization header");
   }
 
   const [scheme, encoded] = authorization.split(" ");
 
-  if (!encoded || scheme !== "Basic") {
-    return {
-      success: false,
-      resp: badRequest("Malformed authorization header or unsupported authentication scheme"),
-    };
+  if (!encoded) {
+    throw Unauthorized("Malformed authorization header");
+  }
+
+  if (scheme !== "Basic") {
+    throw Unauthorized("Unsupported authorization scheme");
   }
 
   const buffer = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
@@ -36,42 +28,26 @@ const getAuthorization = (req: Request): AuthorizationResult => {
   const index = decoded.indexOf(":");
 
   if (index === -1) {
-    return {
-      success: false,
-      resp: badRequest("Invalid authorization value"),
-    };
+    throw Unauthorized("Malformed authorization header");
   }
 
   return {
-    success: true,
     user: decoded.substring(0, index),
     pass: decoded.substring(index + 1),
   };
 };
 
-export type AuthenticationResult =
-  | {
-      success: true;
-    }
-  | {
-      success: false;
-      resp: Response;
-    };
+export const validateAuth = (req: Request, auth: Authorization) => {
+  const { protocol, hostname } = new URL(req.url);
 
-export const isAuthenticated = (req: Request, expectedUser: string, expectedPass: string): AuthenticationResult => {
-  const result = getAuthorization(req);
-
-  if (!result.success) {
-    return {
-      success: false,
-      resp: result.resp,
-    };
+  if (protocol !== "https:" && hostname !== "localhost") {
+    throw BadRequest("You must use an HTTPS connection");
   }
 
-  const { user, pass } = result;
+  const { user, pass } = getAuth(req);
 
   const actualCredentials = `${user}:${pass}`;
-  const expectedCredentials = `${expectedUser}:${expectedPass}`;
+  const expectedCredentials = `${auth.user}:${auth.pass}`;
 
   const encoder = new TextEncoder();
 
@@ -79,20 +55,10 @@ export const isAuthenticated = (req: Request, expectedUser: string, expectedPass
   const encodedExpected = encoder.encode(expectedCredentials);
 
   if (encodedActual.byteLength != encodedExpected.byteLength) {
-    return {
-      success: false,
-      resp: unauthorized(),
-    };
+    throw Unauthorized("Invalid credentials");
   }
 
-  const isEqual = crypto.subtle.timingSafeEqual(encodedActual, encodedExpected);
-
-  if (!isEqual) {
-    return {
-      success: false,
-      resp: unauthorized(),
-    };
+  if (!crypto.subtle.timingSafeEqual(encodedActual, encodedExpected)) {
+    throw Unauthorized("Invalid credentials");
   }
-
-  return { success: true };
 };

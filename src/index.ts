@@ -1,7 +1,7 @@
-import { RouteHandler, Router, error } from "itty-router";
+import { RouteHandler, Router, json } from "itty-router";
 import { Artifact } from "./model";
-import { endpointNotFound, methodNotAllowed, created } from "./response";
-import { isAuthenticated } from "./auth";
+import { MethodNotAllowed, NotFound, ResponseError } from "./response";
+import { validateAuth } from "./auth";
 import { insertArtifact } from "./sql";
 
 const expectedUser = "user";
@@ -15,25 +15,34 @@ const router = Router();
 
 router
   .all("*", (req, env) => {
-    const authResult = isAuthenticated(req, expectedUser, env.AUTH_PASS);
-
-    if (!authResult.success) return authResult.resp;
+    validateAuth(req, { user: expectedUser, pass: env.AUTH_PASS });
   })
-  .all("/submit", async (resp, env) => await submit(resp, env))
-  .all("*", () => endpointNotFound());
+  .all("/submit", async (req, env) => await submit(req, env))
+  .all("*", () => {
+    throw NotFound("No such endpoint");
+  });
 
 const submit: RouteHandler = async (req, env): Promise<Response> => {
   if (req.method !== "POST") {
-    return methodNotAllowed(["POST"]);
+    throw MethodNotAllowed("Unsupported HTTP method", ["POST"]);
   }
 
   const reqBody = await req.json<Artifact>();
 
   await insertArtifact(env.DB, reqBody);
 
-  return created();
+  return new Response(undefined, {
+    status: 201,
+  });
 };
 
 export default {
-  fetch: (request: Request, env: Env) => router.handle(request, env).catch(error),
+  fetch: (request: Request, env: Env) =>
+    router.handle(request, env).catch((err) => {
+      if (err instanceof ResponseError) {
+        return json({ error: err.message, status: err.status }, { status: err.status, headers: err.headers });
+      } else {
+        return json({ error: err.message, status: 500 }, { status: 500 });
+      }
+    }),
 };
