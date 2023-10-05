@@ -4,7 +4,9 @@ import { MethodNotAllowed, NotFound, ResponseError } from "./response";
 import { validateAuth } from "./auth";
 import { insertArtifact } from "./sql";
 
-const expectedUser = "user";
+// Right now, artifact-submit-action is the only client which will be sending artifact metadata to
+// this worker.
+const expectedUser = "artifact-submit-action";
 
 export interface Env {
   DB: D1Database;
