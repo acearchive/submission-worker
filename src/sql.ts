@@ -203,7 +203,7 @@ class Database {
           ),
           ?2,
           unixepoch('now')
-        )
+      )
       `
       )
       .bind(artifactId, artifactKey)
@@ -231,7 +231,7 @@ export const insertArtifact = async (d1: D1Database, artifact: Artifact) => {
   ]);
 
   // This query comes last; it atomically commits the artifact to the database.
-  db.commitArtifact(artifactKey, artifact.id);
+  await db.commitArtifact(artifactKey, artifact.id);
 
   console.log("Finished inserting new artifact");
 };
