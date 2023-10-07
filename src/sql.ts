@@ -107,9 +107,9 @@ class Database {
 
     const aliasStmt = this.db.prepare(`
       INSERT INTO
-        artifact_aliases
+        artifact_aliases (artifact, slug)
       VALUES
-        (artifact, slug)
+        (?1, ?2)
     `);
 
     return aliases.map((alias) => aliasStmt.bind(artifactKey, alias));
