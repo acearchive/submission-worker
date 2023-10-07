@@ -49,6 +49,11 @@ class Database {
     artifactKey: ArtifactKey,
     files: Artifact["files"]
   ): Promise<ReadonlyArray<KeyedArtifactFile>> => {
+    if (files.length === 0) {
+      console.log("There are no files to insert");
+      return [];
+    }
+
     console.log("Inserting into `files` table");
 
     const fileStmt = this.db.prepare(`
@@ -93,6 +98,11 @@ class Database {
     artifactKey: ArtifactKey,
     aliases: Artifact["aliases"]
   ): ReadonlyArray<D1PreparedStatement> => {
+    if (aliases.length === 0) {
+      console.log("There are no artifact aliases to insert");
+      return [];
+    }
+
     console.log("Preparing query to insert into `artifact_aliases` table");
 
     const aliasStmt = this.db.prepare(`
@@ -108,6 +118,11 @@ class Database {
   prepareFileAliases = (
     files: ReadonlyArray<Pick<ArtifactFile, "aliases"> & { key: FileKey }>
   ): ReadonlyArray<D1PreparedStatement> => {
+    if (files.length === 0) {
+      console.log("There are no file aliases to insert");
+      return [];
+    }
+
     console.log("Preparing query to insert into `file_aliases` table");
 
     const aliasStmt = this.db.prepare(`
@@ -121,6 +136,11 @@ class Database {
   };
 
   prepareLinks = (artifactKey: ArtifactKey, links: Artifact["links"]): ReadonlyArray<D1PreparedStatement> => {
+    if (links.length === 0) {
+      console.log("There are no links insert");
+      return [];
+    }
+
     console.log("Preparing query to insert into `links` table");
 
     const stmt = this.db.prepare(`
@@ -134,6 +154,11 @@ class Database {
   };
 
   preparePeople = (artifactKey: ArtifactKey, people: Artifact["people"]): ReadonlyArray<D1PreparedStatement> => {
+    if (people.length === 0) {
+      console.log("There are no people to insert");
+      return [];
+    }
+
     console.log("Preparing query to insert into `people` table");
 
     const stmt = this.db.prepare(`
@@ -150,6 +175,11 @@ class Database {
     artifactKey: ArtifactKey,
     identities: Artifact["identities"]
   ): ReadonlyArray<D1PreparedStatement> => {
+    if (identities.length === 0) {
+      console.log("There are no identities to insert");
+      return [];
+    }
+
     console.log("Preparing query to insert into `identities` table");
 
     const stmt = this.db.prepare(`
@@ -163,6 +193,11 @@ class Database {
   };
 
   prepareDecades = (artifactKey: ArtifactKey, decades: Artifact["decades"]): ReadonlyArray<D1PreparedStatement> => {
+    if (decades.length === 0) {
+      console.log("There are no decades to insert");
+      return [];
+    }
+
     console.log("Preparing query to insert into `decades` table");
 
     const stmt = this.db.prepare(`
