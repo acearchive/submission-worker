@@ -13,3 +13,11 @@ This worker is called by
 [artifact-submit-action](https://github.com/acearchive/artifact-submit-action) to upload new
 artifact metadata and stores the metadata in a [D1](https://developers.cloudflare.com/d1) SQLite
 database.
+
+## Database
+
+This repo is where the database migrations live, in the [migrations/](./migrations/) directory. You
+can apply migrations with [Wrangler](https://developers.cloudflare.com/workers/wrangler/).
+
+You can find documentation for the database schema in the [docs/](./docs/) directory. The schema is
+documented via [dbdiagram.io](https://dbdiagram.io/).
