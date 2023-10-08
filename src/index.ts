@@ -2,7 +2,7 @@ import { RouteHandler, Router, json } from "itty-router";
 import { Artifact } from "./model";
 import { MethodNotAllowed, NotFound, ResponseError } from "./response";
 import { validateAuth } from "./auth";
-import { insertArtifact } from "./sql";
+import { InsertQuery } from "./sql";
 
 // Right now, artifact-submit-action is the only client which will be sending artifact metadata to
 // this worker.
@@ -35,7 +35,7 @@ const submit: RouteHandler = async (req, env): Promise<Response> => {
 
   console.log(JSON.stringify(reqBody));
 
-  await insertArtifact(env.DB, reqBody);
+  await new InsertQuery(env.DB).run(reqBody);
 
   return new Response(undefined, {
     status: 201,

@@ -7,14 +7,14 @@ type FileKey = number;
 // An artifact file with its database primary key.
 type KeyedArtifactFile = ArtifactFile & { key: FileKey };
 
-class Database {
+export class InsertQuery {
   private readonly db: D1Database;
 
   constructor(db: D1Database) {
     this.db = db;
   }
 
-  insertArtifact = async (artifact: Artifact): Promise<ArtifactKey> => {
+  private insertArtifact = async (artifact: Artifact): Promise<ArtifactKey> => {
     console.log("Inserting into `artifacts` table");
 
     const artifactKey = await this.db
@@ -26,7 +26,7 @@ class Database {
           (?1, ?2, ?3, ?4, ?5, ?6)
         RETURNING
           id
-      `
+        `
       )
       .bind(
         artifact.slug,
@@ -39,13 +39,13 @@ class Database {
       .first<number>("id");
 
     if (artifactKey == null) {
-      throw new Error("inserting new artifact did not return a database ID");
+      throw new Error("Inserting new artifact did not return a database ID");
     }
 
     return artifactKey;
   };
 
-  insertFiles = async (
+  private insertFiles = async (
     artifactKey: ArtifactKey,
     files: Artifact["files"]
   ): Promise<ReadonlyArray<KeyedArtifactFile>> => {
@@ -94,7 +94,7 @@ class Database {
     }));
   };
 
-  prepareArtifactAliases = (
+  private prepareArtifactAliases = (
     artifactKey: ArtifactKey,
     aliases: Artifact["aliases"]
   ): ReadonlyArray<D1PreparedStatement> => {
@@ -102,8 +102,6 @@ class Database {
       console.log("There are no artifact aliases to insert");
       return [];
     }
-
-    console.log("Preparing query to insert into `artifact_aliases` table");
 
     const aliasStmt = this.db.prepare(`
       INSERT INTO
@@ -115,15 +113,13 @@ class Database {
     return aliases.map((alias) => aliasStmt.bind(artifactKey, alias));
   };
 
-  prepareFileAliases = (
+  private prepareFileAliases = (
     files: ReadonlyArray<Pick<ArtifactFile, "aliases"> & { key: FileKey }>
   ): ReadonlyArray<D1PreparedStatement> => {
     if (files.length === 0) {
       console.log("There are no file aliases to insert");
       return [];
     }
-
-    console.log("Preparing query to insert into `file_aliases` table");
 
     const aliasStmt = this.db.prepare(`
       INSERT INTO
@@ -135,13 +131,11 @@ class Database {
     return files.flatMap((file) => file.aliases.map((alias) => aliasStmt.bind(file.key, alias)));
   };
 
-  prepareLinks = (artifactKey: ArtifactKey, links: Artifact["links"]): ReadonlyArray<D1PreparedStatement> => {
+  private prepareLinks = (artifactKey: ArtifactKey, links: Artifact["links"]): ReadonlyArray<D1PreparedStatement> => {
     if (links.length === 0) {
       console.log("There are no links insert");
       return [];
     }
-
-    console.log("Preparing query to insert into `links` table");
 
     const stmt = this.db.prepare(`
       INSERT INTO
@@ -153,13 +147,14 @@ class Database {
     return links.map((link) => stmt.bind(artifactKey, link.name, link.url));
   };
 
-  preparePeople = (artifactKey: ArtifactKey, people: Artifact["people"]): ReadonlyArray<D1PreparedStatement> => {
+  private preparePeople = (
+    artifactKey: ArtifactKey,
+    people: Artifact["people"]
+  ): ReadonlyArray<D1PreparedStatement> => {
     if (people.length === 0) {
       console.log("There are no people to insert");
       return [];
     }
-
-    console.log("Preparing query to insert into `people` table");
 
     const stmt = this.db.prepare(`
       INSERT INTO
@@ -171,7 +166,7 @@ class Database {
     return people.map((name) => stmt.bind(artifactKey, name));
   };
 
-  prepareIdentities = (
+  private prepareIdentities = (
     artifactKey: ArtifactKey,
     identities: Artifact["identities"]
   ): ReadonlyArray<D1PreparedStatement> => {
@@ -179,8 +174,6 @@ class Database {
       console.log("There are no identities to insert");
       return [];
     }
-
-    console.log("Preparing query to insert into `identities` table");
 
     const stmt = this.db.prepare(`
       INSERT INTO
@@ -192,13 +185,14 @@ class Database {
     return identities.map((name) => stmt.bind(artifactKey, name));
   };
 
-  prepareDecades = (artifactKey: ArtifactKey, decades: Artifact["decades"]): ReadonlyArray<D1PreparedStatement> => {
+  private prepareDecades = (
+    artifactKey: ArtifactKey,
+    decades: Artifact["decades"]
+  ): ReadonlyArray<D1PreparedStatement> => {
     if (decades.length === 0) {
       console.log("There are no decades to insert");
       return [];
     }
-
-    console.log("Preparing query to insert into `decades` table");
 
     const stmt = this.db.prepare(`
       INSERT INTO
@@ -216,9 +210,9 @@ class Database {
   // rest of the artifact data is committed.
   //
   // If there is a row in `artifacts` without a corresponding row in `artifact_versions`, that data
-  // is considered orphaned and we can clean it up later if necessary. In practice, we will likely
-  // never need to.
-  commitArtifact = async (artifactKey: ArtifactKey, artifactId: Artifact["id"]) => {
+  // is considered orphaned and we can clean it up later if necessary. In practice, we will probably
+  // never need to; the database will likely stay quite small.
+  private commitArtifact = async (artifactKey: ArtifactKey, artifactId: Artifact["id"]) => {
     console.log("Inserting into `artifact_versions` table");
 
     await this.db
@@ -238,35 +232,32 @@ class Database {
           ),
           ?2,
           unixepoch('now')
-      )
-      `
+        )
+        `
       )
       .bind(artifactId, artifactKey)
       .run();
   };
+
+  run = async (artifact: Artifact) => {
+    const artifactKey = await this.insertArtifact(artifact);
+
+    const keyedFiles = await this.insertFiles(artifactKey, artifact.files);
+
+    console.log("Performing batch insert queries");
+
+    await this.db.batch([
+      ...this.prepareArtifactAliases(artifactKey, artifact.aliases),
+      ...this.prepareFileAliases(keyedFiles),
+      ...this.prepareLinks(artifactKey, artifact.links),
+      ...this.preparePeople(artifactKey, artifact.people),
+      ...this.prepareIdentities(artifactKey, artifact.identities),
+      ...this.prepareDecades(artifactKey, artifact.decades),
+    ]);
+
+    // This query comes last; it atomically commits the artifact to the database.
+    await this.commitArtifact(artifactKey, artifact.id);
+
+    console.log("Finished inserting new artifact");
+  };
 }
-
-// Insert an artifact into the database.
-export const insertArtifact = async (d1: D1Database, artifact: Artifact) => {
-  const db = new Database(d1);
-
-  const artifactKey = await db.insertArtifact(artifact);
-
-  const keyedFiles = await db.insertFiles(artifactKey, artifact.files);
-
-  console.log("Performing batch insert queries");
-
-  await d1.batch([
-    ...db.prepareArtifactAliases(artifactKey, artifact.aliases),
-    ...db.prepareFileAliases(keyedFiles),
-    ...db.prepareLinks(artifactKey, artifact.links),
-    ...db.preparePeople(artifactKey, artifact.people),
-    ...db.prepareIdentities(artifactKey, artifact.identities),
-    ...db.prepareDecades(artifactKey, artifact.decades),
-  ]);
-
-  // This query comes last; it atomically commits the artifact to the database.
-  await db.commitArtifact(artifactKey, artifact.id);
-
-  console.log("Finished inserting new artifact");
-};
