@@ -1,4 +1,5 @@
 import { Artifact, ArtifactFile } from "./model";
+import { normalizeArtifact } from "./normalize";
 
 // These types represent database primary keys, not to be confused with an Artifact ID.
 type ArtifactKey = number;
@@ -240,23 +241,25 @@ export class InsertQuery {
   };
 
   run = async (artifact: Artifact) => {
-    const artifactKey = await this.insertArtifact(artifact);
+    const normalized = normalizeArtifact(artifact);
 
-    const keyedFiles = await this.insertFiles(artifactKey, artifact.files);
+    const artifactKey = await this.insertArtifact(normalized);
+
+    const keyedFiles = await this.insertFiles(artifactKey, normalized.files);
 
     console.log("Performing batch insert queries");
 
     await this.db.batch([
-      ...this.prepareArtifactAliases(artifactKey, artifact.aliases),
+      ...this.prepareArtifactAliases(artifactKey, normalized.aliases),
       ...this.prepareFileAliases(keyedFiles),
-      ...this.prepareLinks(artifactKey, artifact.links),
-      ...this.preparePeople(artifactKey, artifact.people),
-      ...this.prepareIdentities(artifactKey, artifact.identities),
-      ...this.prepareDecades(artifactKey, artifact.decades),
+      ...this.prepareLinks(artifactKey, normalized.links),
+      ...this.preparePeople(artifactKey, normalized.people),
+      ...this.prepareIdentities(artifactKey, normalized.identities),
+      ...this.prepareDecades(artifactKey, normalized.decades),
     ]);
 
     // This query comes last; it atomically commits the artifact to the database.
-    await this.commitArtifact(artifactKey, artifact.id);
+    await this.commitArtifact(artifactKey, normalized.id);
 
     console.log("Finished inserting new artifact");
   };
