@@ -159,9 +159,9 @@ export class InsertQuery {
 
     const stmt = this.db.prepare(`
       INSERT INTO
-        people (artifact, name)
+        tags (artifact, key, value)
       VALUES
-        (?1, ?2)
+        (?1, 'person', ?2)
     `);
 
     return people.map((name) => stmt.bind(artifactKey, name));
@@ -178,9 +178,9 @@ export class InsertQuery {
 
     const stmt = this.db.prepare(`
       INSERT INTO
-        identities (artifact, name)
+        tags (artifact, key, value)
       VALUES
-        (?1, ?2)
+        (?1, 'identity', ?2)
     `);
 
     return identities.map((name) => stmt.bind(artifactKey, name));
@@ -197,9 +197,9 @@ export class InsertQuery {
 
     const stmt = this.db.prepare(`
       INSERT INTO
-        decades (artifact, decade)
+        tags (artifact, key, value)
       VALUES
-        (?1, ?2)
+        (?1, 'decade', ?2)
     `);
 
     return decades.map((decade) => stmt.bind(artifactKey, decade));
