@@ -2,15 +2,17 @@ name = "acearchive-submission"
 main = "src/index.ts"
 compatibility_date = "2023-09-22"
 
-[route]
-pattern = "submit.acearchive.lgbt"
-custom_domain = true
+[env.prod]
 
-[[d1_databases]]
-binding = "DB"
-database_name = "acearchive-artifacts"
-database_id = "ffd316de-0455-429b-90c7-45f935183333"
-preview_database_id = "12b24516-946d-4ebd-abbb-8db821159924"
+  [env.prod.route]
+  pattern = "submit.acearchive.lgbt"
+  custom_domain = true
+
+  [[env.prod.d1_databases]]
+  binding = "DB"
+  database_name = "acearchive-artifacts"
+  database_id = "ffd316de-0455-429b-90c7-45f935183333"
+  preview_database_id = "12b24516-946d-4ebd-abbb-8db821159924"
 
 [env.dev]
 
