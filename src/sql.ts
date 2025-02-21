@@ -220,7 +220,7 @@ export class InsertQuery {
       .prepare(
         `
         INSERT INTO
-          artifact_versions (artifact_id, version, artifact, created_at)
+          artifact_versions (artifact_id, version, artifact)
         VALUES (
           ?1,
           (
@@ -231,8 +231,7 @@ export class InsertQuery {
             WHERE
               artifact_id = ?1
           ),
-          ?2,
-          unixepoch('now')
+          ?2
         )
         `
       )
