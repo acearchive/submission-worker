@@ -2,9 +2,9 @@ import { Artifact } from "./model";
 
 export type NormalizedArtifact = Artifact;
 
-// We normalize the names of identities to all-lowercase so we don't have identities which differ
-// only in capitalization. The Hugo site already does case normalization for us, but we need to do
-// it at the database level for the REST API.
+// We normalize the names of identities and collections to all-lowercase so we don't have tags which
+// differ only in capitalization. The Hugo site already does case normalization for us, but we need
+// to do it at the database level for the REST API.
 //
 // It's not really necessary to preserve the original case information; The Hugo site "humanizes"
 // the identity names by making the first letter uppercase. This will clobber some identity names,
@@ -21,4 +21,5 @@ export type NormalizedArtifact = Artifact;
 export const normalizeArtifact = (artifact: Artifact): NormalizedArtifact => ({
   ...artifact,
   identities: artifact.identities.map((identity) => identity.toLowerCase()),
+  collections: artifact.collections.map((collection) => collection.toLowerCase()),
 });

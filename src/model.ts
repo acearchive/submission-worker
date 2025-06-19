@@ -26,5 +26,6 @@ export interface Artifact {
   from_year: string;
   to_year?: string;
   decades: Array<string>;
+  collections: Array<string>;
   aliases: Array<string>;
 }

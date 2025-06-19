@@ -27,7 +27,7 @@ export class InsertQuery {
           (?1, ?2, ?3, ?4, ?5, ?6)
         RETURNING
           id
-        `
+        `,
       )
       .bind(
         artifact.slug,
@@ -35,7 +35,7 @@ export class InsertQuery {
         artifact.summary,
         artifact.description ?? null,
         artifact.from_year,
-        artifact.to_year ?? null
+        artifact.to_year ?? null,
       )
       .first<number>("id");
 
@@ -48,7 +48,7 @@ export class InsertQuery {
 
   private insertFiles = async (
     artifactKey: ArtifactKey,
-    files: Artifact["files"]
+    files: Artifact["files"],
   ): Promise<ReadonlyArray<KeyedArtifactFile>> => {
     if (files.length === 0) {
       console.log("There are no files to insert");
@@ -82,9 +82,9 @@ export class InsertQuery {
           file.media_type ?? null,
           file.multihash,
           file.lang ?? null,
-          file.hidden ? 1 : 0
-        )
-      )
+          file.hidden ? 1 : 0,
+        ),
+      ),
     );
 
     const fileIds = fileRows.map((row) => row.results[0].id);
@@ -97,7 +97,7 @@ export class InsertQuery {
 
   private prepareArtifactAliases = (
     artifactKey: ArtifactKey,
-    aliases: Artifact["aliases"]
+    aliases: Artifact["aliases"],
   ): ReadonlyArray<D1PreparedStatement> => {
     if (aliases.length === 0) {
       console.log("There are no artifact aliases to insert");
@@ -115,7 +115,7 @@ export class InsertQuery {
   };
 
   private prepareFileAliases = (
-    files: ReadonlyArray<Pick<ArtifactFile, "aliases"> & { key: FileKey }>
+    files: ReadonlyArray<Pick<ArtifactFile, "aliases"> & { key: FileKey }>,
   ): ReadonlyArray<D1PreparedStatement> => {
     if (files.length === 0) {
       console.log("There are no file aliases to insert");
@@ -150,7 +150,7 @@ export class InsertQuery {
 
   private preparePeople = (
     artifactKey: ArtifactKey,
-    people: Artifact["people"]
+    people: Artifact["people"],
   ): ReadonlyArray<D1PreparedStatement> => {
     if (people.length === 0) {
       console.log("There are no people to insert");
@@ -169,7 +169,7 @@ export class InsertQuery {
 
   private prepareIdentities = (
     artifactKey: ArtifactKey,
-    identities: Artifact["identities"]
+    identities: Artifact["identities"],
   ): ReadonlyArray<D1PreparedStatement> => {
     if (identities.length === 0) {
       console.log("There are no identities to insert");
@@ -188,7 +188,7 @@ export class InsertQuery {
 
   private prepareDecades = (
     artifactKey: ArtifactKey,
-    decades: Artifact["decades"]
+    decades: Artifact["decades"],
   ): ReadonlyArray<D1PreparedStatement> => {
     if (decades.length === 0) {
       console.log("There are no decades to insert");
@@ -203,6 +203,25 @@ export class InsertQuery {
     `);
 
     return decades.map((decade) => stmt.bind(artifactKey, decade));
+  };
+
+  private prepareCollections = (
+    artifactKey: ArtifactKey,
+    collections: Artifact["collections"],
+  ): ReadonlyArray<D1PreparedStatement> => {
+    if (collections.length === 0) {
+      console.log("There are no collections to insert");
+      return [];
+    }
+
+    const stmt = this.db.prepare(`
+      INSERT INTO
+        tags (artifact, key, value)
+      VALUES
+        (?1, 'collection', ?2)
+    `);
+
+    return collections.map((collection) => stmt.bind(artifactKey, collection));
   };
 
   // We can't batch every insertion into one atomic transaction because we need to set up the
@@ -233,7 +252,7 @@ export class InsertQuery {
           ),
           ?2
         )
-        `
+        `,
       )
       .bind(artifactId, artifactKey)
       .run();
@@ -255,6 +274,7 @@ export class InsertQuery {
       ...this.preparePeople(artifactKey, normalized.people),
       ...this.prepareIdentities(artifactKey, normalized.identities),
       ...this.prepareDecades(artifactKey, normalized.decades),
+      ...this.prepareCollections(artifactKey, normalized.collections),
     ]);
 
     // This query comes last; it atomically commits the artifact to the database.
