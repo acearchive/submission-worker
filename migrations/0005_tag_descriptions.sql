@@ -23,9 +23,7 @@ SELECT DISTINCT
   value,
   key
 FROM
-  tags_old
-WHERE
-  artifact IN (SELECT artifact FROM latest_artifacts);
+  tags_old;
 
 INSERT INTO
   artifact_tags (artifact, tag)
@@ -35,8 +33,6 @@ SELECT
 FROM
   tags_old
 JOIN
-  tags ON tags_old.value = tags.name AND tags_old.key = tags.kind
-WHERE
-  tags_old.artifact IN (SELECT artifact FROM latest_artifacts);
+  tags ON tags_old.value = tags.name AND tags_old.key = tags.kind;
 
 DROP TABLE tags_old;
