@@ -23,9 +23,9 @@ export interface Artifact {
   links: Array<ArtifactLink>;
   people: Array<string>;
   identities: Array<string>;
-  from_year: string;
-  to_year?: string;
-  decades: Array<string>;
+  from_year: number;
+  to_year?: number;
+  decades: Array<number>;
   collections: Array<string>;
   aliases: Array<string>;
 }

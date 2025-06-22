@@ -34,8 +34,8 @@ export class InsertQuery {
         artifact.title,
         artifact.summary,
         artifact.description ?? null,
-        artifact.from_year,
-        artifact.to_year ?? null,
+        artifact.from_year.toString(),
+        artifact.to_year?.toString() ?? null,
       )
       .first<number>("id");
 
@@ -202,7 +202,7 @@ export class InsertQuery {
         (?1, 'decade', ?2)
     `);
 
-    return decades.map((decade) => stmt.bind(artifactKey, decade));
+    return decades.map((decade) => stmt.bind(artifactKey, decade.toString()));
   };
 
   private prepareCollections = (
