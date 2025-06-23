@@ -4,6 +4,9 @@ import { normalizeArtifact } from "./normalize";
 // These types represent database primary keys, not to be confused with an Artifact ID.
 type ArtifactKey = number;
 type FileKey = number;
+type TagKey = number;
+
+type TagKind = "person" | "identity" | "decade" | "collection";
 
 // An artifact file with its database primary key.
 type KeyedArtifactFile = ArtifactFile & { key: FileKey };
@@ -148,81 +151,41 @@ export class InsertQuery {
     return links.map((link) => stmt.bind(artifactKey, link.name, link.url));
   };
 
-  private preparePeople = (
-    artifactKey: ArtifactKey,
-    people: Artifact["people"],
-  ): ReadonlyArray<D1PreparedStatement> => {
-    if (people.length === 0) {
-      console.log("There are no people to insert");
+  private async insertTags(tags: Map<TagKind, Array<string>>): Promise<ReadonlyArray<TagKey>> {
+    if (tags.size === 0) {
+      return [];
+    }
+
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO
+        tags (name, kind)
+      VALUES
+        (?1, ?2)
+      RETURNING
+        id
+    `);
+
+    const tagRows = await this.db.batch<{ id: TagKey }>(
+      Array.from(tags).flatMap(([tagKind, tagNames]) => tagNames.map((tagName) => stmt.bind(tagName, tagKind))),
+    );
+
+    return tagRows.map((row) => row.results[0].id);
+  }
+
+  private prepareArtifactTags(artifactKey: ArtifactKey, tags: Array<TagKey>): ReadonlyArray<D1PreparedStatement> {
+    if (tags.length === 0) {
       return [];
     }
 
     const stmt = this.db.prepare(`
       INSERT INTO
-        tags (artifact, key, value)
+        artifact_tags (artifact, tag)
       VALUES
-        (?1, 'person', ?2)
+        (?1, ?2)
     `);
 
-    return people.map((name) => stmt.bind(artifactKey, name));
-  };
-
-  private prepareIdentities = (
-    artifactKey: ArtifactKey,
-    identities: Artifact["identities"],
-  ): ReadonlyArray<D1PreparedStatement> => {
-    if (identities.length === 0) {
-      console.log("There are no identities to insert");
-      return [];
-    }
-
-    const stmt = this.db.prepare(`
-      INSERT INTO
-        tags (artifact, key, value)
-      VALUES
-        (?1, 'identity', ?2)
-    `);
-
-    return identities.map((name) => stmt.bind(artifactKey, name));
-  };
-
-  private prepareDecades = (
-    artifactKey: ArtifactKey,
-    decades: Artifact["decades"],
-  ): ReadonlyArray<D1PreparedStatement> => {
-    if (decades.length === 0) {
-      console.log("There are no decades to insert");
-      return [];
-    }
-
-    const stmt = this.db.prepare(`
-      INSERT INTO
-        tags (artifact, key, value)
-      VALUES
-        (?1, 'decade', ?2)
-    `);
-
-    return decades.map((decade) => stmt.bind(artifactKey, decade.toString()));
-  };
-
-  private prepareCollections = (
-    artifactKey: ArtifactKey,
-    collections: Artifact["collections"],
-  ): ReadonlyArray<D1PreparedStatement> => {
-    if (collections.length === 0) {
-      console.log("There are no collections to insert");
-      return [];
-    }
-
-    const stmt = this.db.prepare(`
-      INSERT INTO
-        tags (artifact, key, value)
-      VALUES
-        (?1, 'collection', ?2)
-    `);
-
-    return collections.map((collection) => stmt.bind(artifactKey, collection));
-  };
+    return tags.map((tagKey) => stmt.bind(artifactKey, tagKey));
+  }
 
   // We can't batch every insertion into one atomic transaction because we need to set up the
   // foreign key relationships and D1 doesn't allow manual transactions. Instead, we use the
@@ -265,16 +228,22 @@ export class InsertQuery {
 
     const keyedFiles = await this.insertFiles(artifactKey, normalized.files);
 
+    const tagKeys = await this.insertTags(
+      new Map([
+        ["person", artifact.people],
+        ["identity", artifact.identities],
+        ["decade", artifact.decades.map((decade) => decade.toString())],
+        ["collection", artifact.collections],
+      ]),
+    );
+
     console.log("Performing batch insert queries");
 
     await this.db.batch([
       ...this.prepareArtifactAliases(artifactKey, normalized.aliases),
       ...this.prepareFileAliases(keyedFiles),
       ...this.prepareLinks(artifactKey, normalized.links),
-      ...this.preparePeople(artifactKey, normalized.people),
-      ...this.prepareIdentities(artifactKey, normalized.identities),
-      ...this.prepareDecades(artifactKey, normalized.decades),
-      ...this.prepareCollections(artifactKey, normalized.collections),
+      ...this.prepareArtifactTags(artifactKey, [...tagKeys]),
     ]);
 
     // This query comes last; it atomically commits the artifact to the database.
