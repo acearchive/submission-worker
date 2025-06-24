@@ -29,3 +29,15 @@ export interface Artifact {
   collections: Array<string>;
   aliases: Array<string>;
 }
+
+export type TagKind = "person" | "identity" | "decade" | "collection";
+
+export interface Tag {
+  name: string;
+  kind: TagKind;
+  description?: string;
+}
+
+export interface Metadata {
+  tags: Array<Tag>;
+}

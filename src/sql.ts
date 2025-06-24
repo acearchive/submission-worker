@@ -1,4 +1,4 @@
-import { Artifact, ArtifactFile } from "./model";
+import { Artifact, ArtifactFile, Metadata, Tag, TagKind } from "./model";
 import { normalizeArtifact } from "./normalize";
 
 // These types represent database primary keys, not to be confused with an Artifact ID.
@@ -6,12 +6,10 @@ type ArtifactKey = number;
 type FileKey = number;
 type TagKey = number;
 
-type TagKind = "person" | "identity" | "decade" | "collection";
-
 // An artifact file with its database primary key.
 type KeyedArtifactFile = ArtifactFile & { key: FileKey };
 
-export class InsertQuery {
+export class InsertArtifactQuery {
   private readonly db: D1Database;
 
   constructor(db: D1Database) {
@@ -172,7 +170,7 @@ export class InsertQuery {
     return tagRows.map((row) => row.results[0].id);
   }
 
-  private prepareArtifactTags(artifactKey: ArtifactKey, tags: Array<TagKey>): ReadonlyArray<D1PreparedStatement> {
+  private prepareArtifactTags = (artifactKey: ArtifactKey, tags: Array<TagKey>): ReadonlyArray<D1PreparedStatement> => {
     if (tags.length === 0) {
       return [];
     }
@@ -237,7 +235,7 @@ export class InsertQuery {
       ]),
     );
 
-    console.log("Performing batch insert queries");
+    console.log("Performing batch artifact insert queries");
 
     await this.db.batch([
       ...this.prepareArtifactAliases(artifactKey, normalized.aliases),
@@ -252,3 +250,43 @@ export class InsertQuery {
     console.log("Finished inserting new artifact");
   };
 }
+
+export class UpdateMetadataQuery {
+  private readonly db: D1Database;
+
+  constructor(db: D1Database) {
+    this.db = db;
+  }
+
+  private prepareTags = (tags: Array<Tag>): ReadonlyArray<D1PreparedStatement> => {
+    if (tags.length === 0) {
+      console.log("There is no tag metadata to update");
+      return [];
+    }
+
+    const stmt = this.db
+      .prepare(
+        `
+        UPDATE
+          tags
+        SET
+          description = ?3
+        WHERE
+          name = ?1 AND kind = ?2
+        `,
+      );
+
+    console.log("Inserting metadata into `tags` table");
+
+    return tags.map((tag) => stmt.bind(tag.name, tag.kind, tag.description ?? null));
+  }
+
+  run = async (metadata: Metadata) => {
+    console.log("Performing batch metadata update queries");
+
+    await this.db.batch([
+      ...this.prepareTags(metadata.tags),
+    ])
+
+    console.log("Finished updating metadata");
+  }

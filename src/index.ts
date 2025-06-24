@@ -1,8 +1,8 @@
 import { RouteHandler, Router, json } from "itty-router";
-import { Artifact } from "./model";
+import { Artifact, Metadata } from "./model";
 import { MethodNotAllowed, NotFound, ResponseError } from "./response";
 import { validateAuth } from "./auth";
-import { InsertQuery } from "./sql";
+import { InsertArtifactQuery, UpdateMetadataQuery } from "./sql";
 
 // Right now, artifact-submit-action is the only client which will be sending artifact metadata to
 // this worker.
@@ -19,12 +19,13 @@ router
   .all("*", (req, env) => {
     validateAuth(req, { user: expectedUser, pass: env.AUTH_PASS });
   })
-  .all("/submit", async (req, env) => await submit(req, env))
+  .all("/submit", async (req, env) => await submitArtifact(req, env))
+  .all("/metadata", async (req, env) => await setMetadata(req, env))
   .all("*", () => {
     throw NotFound("No such endpoint");
   });
 
-const submit: RouteHandler = async (req, env): Promise<Response> => {
+const submitArtifact: RouteHandler = async (req, env): Promise<Response> => {
   if (req.method !== "POST") {
     throw MethodNotAllowed("Unsupported HTTP method", ["POST"]);
   }
@@ -35,10 +36,28 @@ const submit: RouteHandler = async (req, env): Promise<Response> => {
 
   console.log(JSON.stringify(reqBody));
 
-  await new InsertQuery(env.DB).run(reqBody);
+  await new InsertArtifactQuery(env.DB).run(reqBody);
 
   return new Response(undefined, {
     status: 201,
+  });
+};
+
+const setMetadata: RouteHandler = async (req, env): Promise<Response> => {
+  if (req.method !== "PUT") {
+    throw MethodNotAllowed("Unsupported HTTP method", ["PUT"]);
+  }
+
+  console.log("Deserializing request body");
+
+  const reqBody = await req.json<Metadata>();
+
+  console.log(JSON.stringify(reqBody));
+
+  await new UpdateMetadataQuery(env.DB).run(reqBody);
+
+  return new Response(undefined, {
+    status: 200,
   });
 };
 
