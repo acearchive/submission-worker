@@ -183,7 +183,7 @@ export class InsertArtifactQuery {
     `);
 
     return tags.map((tagKey) => stmt.bind(artifactKey, tagKey));
-  }
+  };
 
   // We can't batch every insertion into one atomic transaction because we need to set up the
   // foreign key relationships and D1 doesn't allow manual transactions. Instead, we use the
@@ -264,9 +264,8 @@ export class UpdateMetadataQuery {
       return [];
     }
 
-    const stmt = this.db
-      .prepare(
-        `
+    const stmt = this.db.prepare(
+      `
         UPDATE
           tags
         SET
@@ -274,19 +273,18 @@ export class UpdateMetadataQuery {
         WHERE
           name = ?1 AND kind = ?2
         `,
-      );
+    );
 
     console.log("Inserting metadata into `tags` table");
 
     return tags.map((tag) => stmt.bind(tag.name, tag.kind, tag.description ?? null));
-  }
+  };
 
   run = async (metadata: Metadata) => {
     console.log("Performing batch metadata update queries");
 
-    await this.db.batch([
-      ...this.prepareTags(metadata.tags),
-    ])
+    await this.db.batch([...this.prepareTags(metadata.tags)]);
 
     console.log("Finished updating metadata");
-  }
+  };
+}
