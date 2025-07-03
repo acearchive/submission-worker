@@ -154,17 +154,29 @@ export class InsertArtifactQuery {
       return [];
     }
 
-    const stmt = this.db.prepare(`
+    // We cannot use `RETURNING` here, because it will not return ignored/conflicting rows.
+    const insertStmt = this.db.prepare(`
       INSERT OR IGNORE INTO
         tags (name, kind)
       VALUES
         (?1, ?2)
-      RETURNING
+    `);
+
+    await this.db.batch<{ id: TagKey }>(
+      Array.from(tags).flatMap(([tagKind, tagNames]) => tagNames.map((tagName) => insertStmt.bind(tagName, tagKind))),
+    );
+
+    const selectStmt = this.db.prepare(`
+      SELECT
         id
+      FROM
+        tags
+      WHERE
+        name = ?1 AND kind = ?2
     `);
 
     const tagRows = await this.db.batch<{ id: TagKey }>(
-      Array.from(tags).flatMap(([tagKind, tagNames]) => tagNames.map((tagName) => stmt.bind(tagName, tagKind))),
+      Array.from(tags).flatMap(([tagKind, tagNames]) => tagNames.map((tagName) => selectStmt.bind(tagName, tagKind))),
     );
 
     return tagRows.map((row) => row.results[0].id);
