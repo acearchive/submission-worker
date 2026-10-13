@@ -1,3 +1,5 @@
+⚠️ **[DEPRECATED]: Migrating the project to [Omeka S](https://omeka.org/s/) has made this repo obsolete.**
+
 # submission-worker
 
 This repo is a [Cloudflare Worker](https://developers.cloudflare.com/workers/) for adding artifact
